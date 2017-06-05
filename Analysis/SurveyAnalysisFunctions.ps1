@@ -141,7 +141,7 @@ function Initialize-HuntReputation {
 		}
 		
 		Foreach ($line in $rawlist) {
-			if ( ( $line -match "^[0-9a-zA-Z]{32}$|^[0-9a-zA-Z]{40}|^[0-9a-zA-Z]{64}") -AND ($line -eq $null) -AND ($line -eq $NullHash) ) {
+			if ( ( $line -match "^[0-9a-zA-Z]{32}$|^[0-9a-zA-Z]{40}|^[0-9a-zA-Z]{64}") -AND ($line -ne $null) -AND ($line -ne $NullHash) ) {
 				$null = $hashlist.Add($line)
 			}
 			$n += 1
@@ -149,7 +149,6 @@ function Initialize-HuntReputation {
 				Write-Progress -Activity "Reading from NIST" -percentcomplete "-1" -status "$n hashes added to Hashtable"
 			}
 		}
-		
 		$timetaken = ((Get-Date) - $start).totalseconds
 		Write-Progress -Activity "Reading from NIST" -percentcomplete "-1" -status "$n hashes added to Hashtable in $timetaken" -Completed
 		Write-Verbose "$n hashes added to Hashtable in $timetaken seconds"
@@ -280,7 +279,6 @@ Param(
 				}
 				#Begin Checks
 				if ( ($item.SHA1 -ne $Null) -AND ($item.SHA1 -ne "")) {
-									
 					#Check Hash against file reputation lists
 					if ($Global:FileReputation.Contains($item.SHA1)) {
 						$item.Status = $Global:FileReputation[$item.SHA1]
@@ -342,7 +340,8 @@ Param(
 			#>
 			
 			$n += 1
-			Write-Progress -Activity "Processing HostObjects" -percentcomplete "$n/$total" -status "Processing HostObject $n of $total"
+			$percentdone = $n/$total
+			Write-Progress -Activity "Processing HostObjects" -percentcomplete "$percentdone" -status "Processing HostObject $n of $total"
 			Write-Verbose "($n): Processing $PathName"		
 			
 
@@ -361,8 +360,10 @@ Param(
 
 				# process ProcessList
 				Write-Verbose "Processing ProcessList..."
+				Write-Verbose "there"
 				$null = Compare-Hash $HostObject.ProcessList
 				
+				Write-Verbose "here"
 				Foreach ($item in $HostObject.ProcessList) {
 					# Items that cannot be checked but should be there (Idle Process, System, etc):
 					if ( ($item.ProcessId -eq 0) -OR ($item.ProcessId -eq 4) ) {
@@ -618,7 +619,7 @@ function Group-HuntObjects {
 Param(
 	[Parameter(Position=0, Mandatory=$True, ValueFromPipeline=$True,
 		HelpMessage="List of Paths to HostObjects")]
-	[ValidateScript({ Test-Path $_ -PathType Leaf -Include *.xml })]	
+#	[ValidateScript({ Test-Path $_.fullname -PathType Leaf -Include *.xml })]	
 	[alias("PathNames")]
 	[string[]]$HostObjects,
 
@@ -633,7 +634,7 @@ Param(
 	[String]$OutFile="GroupedObject"
 )
 		
-	BEGIN {
+#	BEGIN {
         
         $ErrorActionPreference = "Stop"
 
@@ -672,11 +673,26 @@ Param(
 
 		# Build GroupedObject
 		$n = 0
+		
+		$MyComps = @($Input)
+		$HostCount = $MyComps.count
+		
+		# This picks up cases where the $Computer variable was given as a command line parameter vs. from the pipeline
+		if(($HostCount -eq 0) -AND ($HostObjects -ne $null)) {
+			$MyComps = @()
+			if(Test-Path $HostObjects) {
+				$MyComps = Get-Content $HostObjects
+			} else {
+				$MyComps += $HostObjects
+			}
+			$HostCount = $MyComps.count
+		}
+		
 		$nh = $HostObjects.count
 
-	}
-	PROCESS {
-		Foreach ($Path in $HostObjects) {
+#	}
+#	PROCESS {
+		Foreach ($Path in $MyComps) {
 			# Import host Objects
 			$n += 1
 			Write-Verbose "($n of $nh): Parsing $Path into GroupedObject"	
@@ -874,9 +890,9 @@ Param(
 				RunTime 	= $HostObject.RunTime
 				}
 		}
-	}	
+#	}	
 
-	END {
+#	END {
         
 		# Build GroupedObject 
 		$GroupedObject = New-Object PSObject -Property @{
@@ -900,6 +916,6 @@ Param(
 		Write-Progress -Activity "Grouping HostObjects" -percentcomplete "-1" -status "$n HostObjects grouped" -Completed
 		Write-Verbose "$n HostObjects grouped in $timetaken seconds and exported to $ExportFile"
 		return $GroupedObject
-	}
+#	}
 }
 

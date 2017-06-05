@@ -8,7 +8,17 @@ function Write-Log {
 	)
 	$Time = get-date -format "yyyy-MM-dd hh:mm:ss:ms"
 	if ($Msg -match "ERROR") {
-		Write-Warning "($n): $Msg"	
+		$a = (Get-Host).PrivateData
+		$temp = $a.VerboseForegroundColor
+		$a.VerboseForegroundColor = "red"
+		Write-Verbose "($n): $Msg"	
+		$a.VerboseForegroundColor = $temp
+	} elseif ($Msg -like "*SUCCESS*") {
+	    $a = (Get-Host).PrivateData
+		$temp = $a.VerboseForegroundColor
+		$a.VerboseForegroundColor = "green"
+		Write-Verbose "($n): $Msg"	
+		$a.VerboseForegroundColor = $temp
 	} else {
 		Write-Verbose "($n): $Msg"	
 	}

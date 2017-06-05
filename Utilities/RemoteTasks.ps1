@@ -99,9 +99,9 @@ function Invoke-HuntSurvey {
 			$Credential
 		)
 
-	BEGIN {
+#	BEGIN {
 		
-		function Write-Log {
+<# 		function Write-Log {
 			Param(	
 				[string]$Target, 
 				[String]$LogPath, 
@@ -115,7 +115,7 @@ function Invoke-HuntSurvey {
 				Write-Verbose "($n): $Msg"	
 			}
 			"$Time, $Target, " + $Msg | Out-File -Encoding 'ASCII' -Append $LogPath
-		}
+		} #>
 
 		
 		# Generate Random filename (random but will start with 'ps' and end in .ps1)
@@ -124,30 +124,44 @@ function Invoke-HuntSurvey {
 		$date = get-date -uformat "%Y%m%d"	
 		
 		# Prep log for new scan		
-		if (-NOT (Test-Path $PSScriptRoot\..\log)) { $null = New-Item $PSScriptRoot\..\log -Force }
+		if (-NOT (Test-Path $PSScriptRoot\..\log)) { $null = New-Item -ItemType directory $PSScriptRoot\..\log -Force }
 		$LogPath = "$(Resolve-Path $PSScriptRoot\..\log\)\HuntLog.log"
 		
 		# Create Data Directories
-		if (-NOT (Test-Path $DATADIR)) { $null = New-Item $DATADIR -Force}
-		if (-NOT (Test-Path "$DATADIR\$date")) { $null = New-Item "$DATADIR\$date" -Force}
+		if (-NOT (Test-Path $DATADIR)) { $null = New-Item -ItemType directory $DATADIR -Force}
+		if (-NOT (Test-Path "$DATADIR\$date")) { $null = New-Item -ItemType directory "$DATADIR\$date" -Force}
 		
 		$n = 0
-	}
+		
+		$MyComps = @($Input)
+		$HostCount = $MyComps.count
+		
+		# This picks up cases where the $Computer variable was given as a command line parameter vs. from the pipeline
+		if(($HostCount -eq 0) -AND ($ComputerName -ne $null)) {
+			$MyComps = @()
+			if(Test-Path $ComputerName) {
+				$MyComps = Get-Content $ComputerName
+			} else {
+				$MyComps += $ComputerName
+			}
+			$HostCount = $MyComps.count
+		}
+#	}
 
-	PROCESS {
+#	PROCESS {
 
-        $HostCount = $ComputerName.count
+        #$HostCount = $ComputerName.count
         $datetime = (Get-Date).ToString()
         Write-Verbose "STARTING NEW SURVEY ($HostCount systems) - $datetime - Using Task $SurveyPath via Execution Type $ExecutionType"
 
-		foreach ($Target in $ComputerName) {
+		foreach ($Target in $MyComps) {
 			if ( ($Target -eq $null) -OR ($Target -eq "") ) { continue }
 			
 			$n += 1
 			
 			#  Making local output directory
 			$TargetDATADIR = "$DATADIR\$date\$Target"
-			if (-NOT (Test-Path $TargetDATADIR)) { $null = New-Item $TargetDATADIR }
+			if (-NOT (Test-Path $TargetDATADIR)) { $null = New-Item -ItemType directory $TargetDATADIR }
 			
 			# Setting remote folder paths and UNC path
 			$RemotePath = 'C:\Windows\temp'
@@ -297,14 +311,14 @@ function Invoke-HuntSurvey {
 			Write-Log $Target $LogPath "Task executed with result: $result" $n
 			#endregion Execute
 		}
-	}
+#	}
 
-	END {
+#	END {
 		# End scan
 		$datetime = (Get-Date).ToString()
         Write-Progress -activity "Deploying Surveys" -Complete
         Write-Verbose "SURVEY COMPLETE ($HostCount systems) - $datetime - Using Task $SurveyPath via Execution Type $ExecutionType"
-	}
+#	}
 }
 
 function Get-HuntSurveyResults {
@@ -362,7 +376,7 @@ function Get-HuntSurveyResults {
 			$Credential
 			)
 
-	BEGIN {
+#	BEGIN {
 		#$ErrorActionPreference = "Continue"
 		#$DebugActionPreference = "Continue"
 		
@@ -408,7 +422,7 @@ function Get-HuntSurveyResults {
 			return "SUCCESS: Task Removed from $Target"
 		}  
 
-		function Write-Log {
+<# 		function Write-Log {
 			Param(	
 				[string]$Target, 
 				[String]$LogPath, 
@@ -422,7 +436,7 @@ function Get-HuntSurveyResults {
 				Write-Verbose "($n): $Msg"	
 			}
 			"$Time, $Target, " + $Msg | Out-File -Encoding 'ASCII' -Append $LogPath
-		}
+		} #>
 
 		
 		#endregion Functions
@@ -431,23 +445,37 @@ function Get-HuntSurveyResults {
 		$ResultsFileName = Split-Path $RemotePath -Leaf
 		
 		# Prep log		
-		if (-NOT (Test-Path $PSScriptRoot\..\log)) { $null = New-Item $PSScriptRoot\..\log -Force }
+		if (-NOT (Test-Path $PSScriptRoot\..\log)) { $null = New-Item -ItemType directory $PSScriptRoot\..\log -Force }
 		$LogPath = "$(Resolve-Path $PSScriptRoot\..\log\)\HuntLog.log"
 		
 		# Create Data Directories if not already made
-		if (-NOT (Test-Path $DATADIR)) { $null = New-Item $DATADIR -Force}
-		if (-NOT (Test-Path "$DATADIR\$date")) { $null = New-Item "$DATADIR\$date" -Force}
+		if (-NOT (Test-Path $DATADIR)) { $null = New-Item -ItemType directory $DATADIR -Force}
+		if (-NOT (Test-Path "$DATADIR\$date")) { $null = New-Item -ItemType directory "$DATADIR\$date" -Force}
 	
 		$n = 0
-	}
+		
+		$MyComps = @($Input)
+		$HostCount = $MyComps.count
+		
+		# This picks up cases where the $Computer variable was given as a command line parameter vs. from the pipeline
+		if(($HostCount -eq 0) -AND ($ComputerName -ne $null)) {
+			$MyComps = @()
+			if(Test-Path $ComputerName) {
+				$MyComps = Get-Content $ComputerName
+			} else {
+				$MyComps += $ComputerName
+			}
+			$HostCount = $MyComps.count
+		}
+#	}
 
-	PROCESS {
+#	PROCESS {
 
-        $HostCount = $ComputerName.count
+        #$HostCount = $ComputerName.count
         $datetime = (Get-Date).ToString()
         Write-Verbose "STARTING SURVEY RESULT RECOVERY ($HostCount systems) - $datetime - Recovering $ResultsFileName"
 
-		foreach ($target in $ComputerName) {
+		foreach ($target in $MyComps) {
 			if ( ($Target -eq $null) -OR ($Target -eq "") ) { continue }
 			
 			$n += 1
@@ -476,13 +504,14 @@ function Get-HuntSurveyResults {
 			#endregion Test
 
 			#region PICKUP
-			
+			$pickedup = $false
 			try {
 				Write-Debug "($n): Transfering $RemoteUNCPath to $TargetDATADIR\$pickuptime-$ResultsFileName"
 				$RemoteDisk = New-PSDrive -Name "RD" -PSProvider FileSystem -Root (Split-Path $RemoteUNCPath -Parent) -Credential $credential
 				if (Test-Path RD:\$ResultsFileName) {
 					$null = Move-Item -Path RD:\$ResultsFileName -Destination $TargetDATADIR\$pickuptime-$ResultsFileName -Force
-					Write-Log $Target $LogPath "SUCCESS[Get-HuntSurveyResults]: Recovered $RemoteUNCPath to $TargetDATADIR\$pickuptime-$ResultsFileName" $n				
+					Write-Log $Target $LogPath "SUCCESS[Get-HuntSurveyResults]: Recovered $RemoteUNCPath to $TargetDATADIR\$pickuptime-$ResultsFileName" $n	
+					$pickedup = $true
 				} else {
 					# Survey Results not present
 					Write-Log $Target $LogPath "FAILURE[Get-HuntSurveyResults]: $RemoteUNCPath was not found" $n		
@@ -530,17 +559,19 @@ function Get-HuntSurveyResults {
 				$null = Remove-PSDrive -name RD -PSProvider FileSystem
 			}
 			#endregion Cleanup
-
-        Write-Output (Resolve-Path $TargetDATADIR\$pickuptime-$ResultsFileName)
+		
+		if($pickedup) {
+			Write-Output (Resolve-Path $TargetDATADIR\$pickuptime-$ResultsFileName)
+			}
 		}
-	}
+#	}
 
-	END {
+#	END {
 		# End scan
 		$datetime = (Get-Date).ToString()
         Write-Progress -activity "Recovering Survey Results" -Complete
         Write-Verbose "COMPLETED SURVEY RESULT RECOVERY ($HostCount systems) - $datetime - $RemotePath has been picked up"
 		
-	}
+#	}
 }
 		

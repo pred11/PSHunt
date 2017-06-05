@@ -4,7 +4,7 @@ Get-ChildItem $PSScriptRoot |
     % {Get-ChildItem "$($_.FullName)\*" -Filter '*.ps1'} |
     % {
 		Import-Module $_.FullName
+		write-host $_.FullName
 	}
 Import-Module $PSScriptRoot\Lib\Posh-VirusTotal\Posh-VirusTotal.psm1
 Import-Module $PSScriptRoot\Lib\PSReflect\PSReflect.psm1
-
