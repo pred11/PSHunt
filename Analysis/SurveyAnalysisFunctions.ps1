@@ -688,7 +688,7 @@ Param(
 			$HostCount = $MyComps.count
 		}
 		
-		$nh = $HostObjects.count
+		$nh = $HostCount
 
 #	}
 #	PROCESS {
