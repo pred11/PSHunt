@@ -4732,7 +4732,7 @@ Switch ($ReturnType) {
 	"DropToDisk" {
 		# Drop to Disk
 		# Export Object to XML
-		Write-Verbose "Exporting HostObject!"
+		Write-Verbose "Exporting HostObject to $OutPath"
 		$HostObject | Export-CliXML $OutPath -encoding 'UTF8' -force
 	}
 	"HTTPPostback" {

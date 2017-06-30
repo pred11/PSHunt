@@ -514,7 +514,7 @@ function Get-HuntSurveyResults {
 					$pickedup = $true
 				} else {
 					# Survey Results not present
-					Write-Log $Target $LogPath "FAILURE[Get-HuntSurveyResults]: $RemoteUNCPath was not found" $n		
+					Write-Log $Target $LogPath "ERROR[Get-HuntSurveyResults]: $RemoteUNCPath was not found" $n		
 				}				
 			} catch [System.UnauthorizedAccessException] {
 				# Access Denied

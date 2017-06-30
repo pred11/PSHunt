@@ -186,13 +186,45 @@ function Initialize-HuntReputation {
 		
 		return $hashlist
 	}
+	
+	function Import-MaldomainsReputation {
+		Param(
+			[String]$Path
+		)
+		$start = Get-Date
+		$hashlist = @{}
+		try { 
+			$malfile = get-content $path 
+		} catch { 
+			Write-Warning Could not get reputation from $Path
+			return 
+		}
+		$TotalItems = $malfile.count
+		$n = 1
+		Foreach ($line in $malfile) { 
+			$items = $line.trimstart().split()
+			if( $items[0][0] -eq "#") {
+				continue
+			}
+			$hashlist.Add($items[0], $items[1]+":"+$items[2]+":"+$items[3]+":"+$items[4])
+			if ($n%1000 -eq 0) {
+				Write-Progress -Activity "Importing Malware Domain Reputation" -percentcomplete "-1" -status "$n added to Hashtable"
+			}
+			$n += 1
+		}
+		$timetaken = ((Get-Date) - $start).totalseconds
+		Write-Progress -Activity "Importing Malware Domain Reputation" -percentcomplete "-1" -status "$n added to Hashtable in $timetaken" -Completed
+		Write-Verbose "$n domains added to Hashtable in $timetaken seconds"
 		
+		return $hashlist
+	}		
 	# Load ReputationData
 	
 	$NISTPath = Resolve-Path $PSScriptRoot\..\ReputationData\NIST_SHA1.txt
 	$FileReputationPath = Resolve-Path $PSScriptRoot\..\ReputationData\Files.csv
 	$URLReputationPath = Resolve-Path $PSScriptRoot\..\ReputationData\URL_IP.csv
 	$PipesReputationPath = Resolve-Path $PSScriptRoot\..\ReputationData\Pipes.csv
+	$MaldomainsReputationPath = Resolve-Path $PSScriptRoot\..\ReputationData\maldomains.tsv
 	
 	if (!$Global:NIST) {
 		$Message = "Loading NIST Database - {0:N2} MB" -f ((Get-ItemProperty -path $NistPath).length/1000000)
@@ -208,6 +240,11 @@ function Initialize-HuntReputation {
 		$Message = "Loading URLReputation - {0:N2} MB" -f ((Get-ItemProperty -path $URLReputationPath).length/1000000)
 		Write-Verbose $Message 
 		$Global:URLReputation = Import-URLReputation $URLReputationPath
+	}
+	if ( ($Reload) -OR (!$Global:MaldomainsReputation) ) {
+		$Message = "Loading MaldomainsReputation - {0:N2} MB" -f ((Get-ItemProperty -path $MaldomainsReputationPath).length/1000000)
+		Write-Verbose $Message 
+		$Global:MaldomainsReputation = Import-MaldomainsReputation $MaldomainsReputationPath
 	}
 	<#
 	if (!$Global:PipesReputation) {
@@ -299,10 +336,24 @@ Param(
 			foreach ($cnx in $Netstat) { 
 				# Assign process's check
 				$cnx | Add-Member -type NoteProperty -name Status -value "Unknown" -Force
-				if ($item.Dst_Address) {
+				if ($cnx.Dst_Address) {
 					# Check IP/URL
-					if ($Global:URLReputation.Contains($Item.Dst_Address)) {
-						$item.Status = $Global:URLReputation[$item.Dst_Address]
+					if ($Global:URLReputation.Contains($cnx.Dst_Address)) {
+						$cnx.Status = $Global:URLReputation[$cnx.Dst_Address]
+					}
+				}
+			}
+		}
+		
+		# Process DNS against domain Reputation
+		function Compare-Domain ($domain) {
+			foreach ($cnx in $domain) { 
+				# Assign process's check
+				$cnx | Add-Member -type NoteProperty -name Status -value "Unknown" -Force
+				if ($cnx.Request) {
+					# Check IP/URL
+					if ($Global:MaldomainsReputation.Contains($cnx.Request)) {
+						$cnx.Status = "Bad"
 					}
 				}
 			}
@@ -360,10 +411,8 @@ Param(
 
 				# process ProcessList
 				Write-Verbose "Processing ProcessList..."
-				Write-Verbose "there"
 				$null = Compare-Hash $HostObject.ProcessList
 				
-				Write-Verbose "here"
 				Foreach ($item in $HostObject.ProcessList) {
 					# Items that cannot be checked but should be there (Idle Process, System, etc):
 					if ( ($item.ProcessId -eq 0) -OR ($item.ProcessId -eq 4) ) {
@@ -395,6 +444,10 @@ Param(
 				Write-Verbose "Processing connections..."
 				$null = Compare-Connection $HostObject.NetStat
  
+				# Process DisplayDNS
+				Write-Verbose "Processing cached DNS entries..."
+				$null = Compare-Domain $HostObject.DisplayDNS
+				
 				$HostObject.Processed = $true	
 				$HostObject.DateProcessed = Get-Date
 				
@@ -668,6 +721,7 @@ Param(
 		$Connections = @()
 		$InstalledPrograms = @()
 		$OSHashList = @{}
+		$DisplayDNSList = @()
 		$ScanMetaData = @()
 		$HostList = @()
 
@@ -813,7 +867,31 @@ Param(
 					$AutorunList += $item					
 				}
 			}
-
+			
+			#DisplayDNS
+			Write-Verbose("Starting DisplayDNS")
+			Foreach ($item in $HostObject.DisplayDNS) {
+				$req = $item.Request
+				$ans = $item.Answer
+				if (($req -eq $null) -OR ($req -eq "") -OR ($ans -eq $null) -OR ($ans -eq "") ) {
+					continue
+				}
+				write-verbose($item)
+				if ($DisplayDNSList.Request -contains $req -AND $DisplayDNSList.Answer -contains $ans) {
+					$DisplayDNSList | where { $_.Request -contains $req -AND $_.Answer -contains $ans } | % {
+						$_.Occurances +=1 
+                        if ($_.Hosts -notcontains $HostObject.Hostname) { 
+                            $_.Hosts += $HostObject.HostName 
+                        }
+						continue
+					}
+				} else {
+					$item | Add-Member -type NoteProperty -name Hosts -value @($HostObject.HostName) -Force
+					$item | Add-Member -type NoteProperty -name Occurances -value 1 -Force
+					$DisplayDNSList += $item					
+				}
+			}
+			Write-Verbose("Ending DisplayDNS")
 			#InstalledApps
 			Foreach ($item in $HostObject.InstalledApps) {
 				$App = $item.DisplayName
@@ -837,9 +915,11 @@ Param(
 			}
 			
 			# Memory Injects
-			$HostObject.InjectedModules | where { $_.PE -eq $true } | % {
-				$_ | Add-Member -type NoteProperty -name HostName -value $HostObject.HostName -Force
-				$MemoryInjects += $_
+			Foreach ($item in $HostObject.InjectedModules) {
+				if($item.PE -eq $true) {
+					$item | Add-Member -type NoteProperty -name HostName -value $HostObject.HostName -Force
+					$MemoryInjectList += $item
+				}
 			}
 			
 			$HostObject.NetStat | where {($_.Protocol -eq 'TCP') -AND ($_.State -eq "ESTABLISHED") -AND ( $_.Src_Address -ne $_.Dst_Address ) } | % {
@@ -907,7 +987,8 @@ Param(
 			InstalledPrograms	= $InstalledPrograms
 			Accounts			= $AccountList
 			AutorunList			= $AutorunList
-			MemoryInjects		= $MemoryInjects
+			DisplayDNSList		= $DisplayDNSList
+			MemoryInjects		= $MemoryInjectList
 			ScanMetaData		= $ScanMetaData
 		}
 		# Export GroupedObject
